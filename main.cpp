@@ -90,7 +90,7 @@ struct GaussianWavePacket {
 
 void set_initial_condition(VectorXcd& u0, const VectorXd& xs,
                            const VectorXd& ys) {
-  GaussianWavePacket gwp{0.2, 0.4, 0.05, std::numbers::pi * 15.0, 0.0};
+  GaussianWavePacket gwp{0.2, 0.4, 0.08, std::numbers::pi * 85.0, 0.0};
 
   for (auto i = 0; i < ys.size(); ++i)
     for (auto j = 0; j < xs.size(); ++j)
@@ -103,8 +103,8 @@ void output_solution(std::ostream& os, const VectorXcd& u, const VectorXd& xs,
     for (auto j = 0; j < xs.size(); ++j) {
       auto id = j + i * xs.size();
       os << std::setprecision(15) << xs[j] << ' ' << ys[i] << ' '
-         << std::norm(u[id]) << ' '
-         << u[id].real() << ' ' << u[id].imag() << '\n';
+         << std::norm(u[id]) << ' ' << u[id].real() << ' ' << u[id].imag()
+         << '\n';
     }
     os << '\n';
   }
@@ -131,10 +131,10 @@ int main() {
   set_initial_condition(u0, xs, ys);
   set_matrix(A, xs, ys, dt);
   set_rhs(b, u0, xs, ys, dt);
-  SparseLU<decltype(A)> chol;
-  chol.compute(A);
+  SparseLU<decltype(A)> solver;
+  solver.compute(A);
 
-  if (chol.info() != Success) {
+  if (solver.info() != Success) {
     std::cerr << "Error\n";
     exit(EXIT_FAILURE);
   }
@@ -146,13 +146,13 @@ int main() {
   auto print = 0;
   auto t = 0.0;
   for (; i < 2048; ++i, t += dt) {
-    if (i % 8 == 0) {
+    if (i % 16 == 0) {
       ofs.open("./data/u" + std::to_string(print++) + ".dat");
       output_solution(ofs, u0, xs, ys);
       ofs.close();
     }
 
-    u = chol.solve(b);
+    u = solver.solve(b);
     u0 = u;
     b.setZero();
     set_rhs(b, u0, xs, ys, dt);
