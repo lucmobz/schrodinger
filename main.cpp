@@ -90,7 +90,7 @@ struct GaussianWavePacket {
 
 void set_initial_condition(VectorXcd& u0, const VectorXd& xs,
                            const VectorXd& ys) {
-  GaussianWavePacket gwp{0.2, 0.4, 0.05, 10000.0/*std::numbers::pi * 15.0*/, 0.0};
+  GaussianWavePacket gwp{0.2, 0.4, 0.05, std::numbers::pi * 15.0, 0.0};
 
   for (auto i = 0; i < ys.size(); ++i)
     for (auto j = 0; j < xs.size(); ++j)
@@ -111,7 +111,7 @@ void output_solution(std::ostream& os, const VectorXcd& u, const VectorXd& xs,
 }
 
 int main() {
-  auto nx = 64;
+  auto nx = 256;
   auto ny = nx;
   auto sz = nx * ny;
   VectorXd xs = VectorXd::LinSpaced(nx, 0.0, 1.0);
@@ -143,10 +143,13 @@ int main() {
   std::cout << "Solving dofs: " << sz << "\n";
 
   auto i = 0;
-  for (auto t = 0.0; i < 512; ++i, t += dt) {
-    ofs.open("./data/u" + std::to_string(i) + ".dat");
-    output_solution(ofs, u0, xs, ys);
-    ofs.close();
+  auto print = 0;
+  for (auto t = 0.0; i < 2048; ++i, t += dt) {
+    if (i % 8) {
+      ofs.open("./data/u" + std::to_string(print++) + ".dat");
+      output_solution(ofs, u0, xs, ys);
+      ofs.close();
+    }
 
     u = chol.solve(b);
     u0 = u;
@@ -156,7 +159,7 @@ int main() {
     std::cout << "Solved iteration: " << i << ", time: " << t << "\n";
   }
 
-  ofs.open("./data/u" + std::to_string(i) + ".dat");
+  ofs.open("./data/u" + std::to_string(print++) + ".dat");
   output_solution(ofs, u0, xs, ys);
   ofs.close();
 }
