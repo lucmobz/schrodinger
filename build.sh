@@ -1,6 +1,6 @@
 #!/bin/sh -e
 
-#CPPFLAGS="-std=c++20 -ggdb3 -Wall -Wextra -Wpedantic"
+#CPPFLAGS="-std=c++20 -ggdb3 -march=native -Wall -Wextra -Wpedantic"
 CPPFLAGS="-std=c++20 -O3 -march=native"
 EIGEN_INC="./eigen"
 

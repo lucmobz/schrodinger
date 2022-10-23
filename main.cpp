@@ -1,5 +1,4 @@
 #include <Eigen/Dense>
-#include <fstream>
 #include <Eigen/Sparse>
 #include <cmath>
 #include <complex>
@@ -86,7 +85,7 @@ struct GaussianWavePacket {
 
 void set_initial_condition(VectorXcd& u0, const VectorXd& xs,
                            const VectorXd& ys) {
-  GaussianWavePacket gwp{0.2, 0.5, 0.05, 0.0, 0.0};
+  GaussianWavePacket gwp{0.2, 0.5, 0.05, 1.0, 0.0};
 
   for (auto i = 0; i < ys.size(); ++i)
     for (auto j = 0; j < xs.size(); ++j)
@@ -110,13 +109,11 @@ int main() {
   auto nx = 512;
   auto ny = nx;
   auto sz = nx * ny;
-
   VectorXd xs = VectorXd::LinSpaced(nx, 0.0, 1.0);
-  VectorXd ys = VectorXd::LinSpaced(ny, 0.0, 1.0);
-
+  VectorXd ys = xs;
   auto dx = xs[1] - xs[0];
-  auto dy = ys[1] - ys[0];
-  auto dt = nx * ny * 1.0e-2;
+  auto dy = dx;
+  auto dt = dx * dy * 1.0e-1;
 
   SparseMatrix<std::complex<double>> A(sz, sz);
   VectorXcd b;
@@ -126,27 +123,33 @@ int main() {
   u.setZero(sz);
   u0.setZero(sz);
 
+  set_initial_condition(u0, xs, ys);
   set_matrix(A, xs, ys, dt);
   set_rhs(b, u0, xs, ys, dt);
-  set_initial_condition(u0, xs, ys);
-  SimplicialCholesky<decltype(A)> chol(A);
+  SimplicialLDLT<decltype(A)> chol(A);
 
-  std::ofstream ofs{"./data/u0.dat"};
-  output_solution(ofs, u0, xs, ys);
-  ofs.close();
+  if (chol.info() != Success) {
+    std::cerr << "Error\n";
+    exit(EXIT_FAILURE);
+  }
 
-  auto t = 0.0;
-  for (auto i = 1; i <= 128; ++i, t += dt) {
-    u = chol.solve(b);
-    u0 = u;
-    set_rhs(b, u0, xs, ys, dt);
+  std::ofstream ofs;
+  std::cout << "Solving dofs: " << sz << "\n";
 
-    std::cout << u0.norm() << '\n';
-
+  auto i = 0;
+  for (auto t = 0.0; i < 32; ++i, t += dt) {
     ofs.open("./data/u" + std::to_string(i) + ".dat");
     output_solution(ofs, u0, xs, ys);
     ofs.close();
 
-    if (i == 2) break;
+    u = chol.solve(b);
+    u0 = u;
+    set_rhs(b, u0, xs, ys, dt);
+
+    std::cout << "Solved iteration: " << i << ", time: " << t << "\n";
   }
+
+  ofs.open("./data/u" + std::to_string(i) + ".dat");
+  output_solution(ofs, u0, xs, ys);
+  ofs.close();
 }
