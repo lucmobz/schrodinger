@@ -144,8 +144,9 @@ int main() {
 
   auto i = 0;
   auto print = 0;
-  for (auto t = 0.0; i < 2048; ++i, t += dt) {
-    if (i % 8) {
+  auto t = 0.0;
+  for (; i < 2048; ++i, t += dt) {
+    if (i % 8 == 0) {
       ofs.open("./data/u" + std::to_string(print++) + ".dat");
       output_solution(ofs, u0, xs, ys);
       ofs.close();
@@ -155,11 +156,13 @@ int main() {
     u0 = u;
     b.setZero();
     set_rhs(b, u0, xs, ys, dt);
-
-    std::cout << "Solved iteration: " << i << ", time: " << t << "\n";
   }
 
   ofs.open("./data/u" + std::to_string(print++) + ".dat");
   output_solution(ofs, u0, xs, ys);
   ofs.close();
+
+  std::cout << i << '\n';
+  std::cout << print << '\n';
+  std::cout << t << '\n';
 }
