@@ -9,17 +9,18 @@
 #include <string>
 #include <vector>
 
+#include "Timer.hpp"
+
 using namespace Eigen;
 
 static constexpr auto get_potential(double x, double y) { return 0.0; }
 
-void set_matrix(SparseMatrix<std::complex<double>>& A, const VectorXd& xs,
-                const VectorXd& ys, double dt) {
-  using namespace std::complex_literals;
-
+template <typename SparseMatrixType>
+void set_matrix(SparseMatrixType& A, const VectorXd& xs, const VectorXd& ys,
+                double dt) {
   auto dx = xs[1] - xs[0];
   auto dy = ys[1] - ys[0];
-  auto ct = 1.0i * dt;
+  std::complex<double> ct{0.0, dt};
   auto cx = ct / (4.0 * dx * dx);
   auto cy = ct / (4.0 * dy * dy);
 
@@ -45,11 +46,9 @@ void set_matrix(SparseMatrix<std::complex<double>>& A, const VectorXd& xs,
 
 void set_rhs(VectorXcd& b, const VectorXcd& u0, const VectorXd& xs,
              const VectorXd& ys, double dt) {
-  using namespace std::complex_literals;
-
   auto dx = xs[1] - xs[0];
   auto dy = ys[1] - ys[0];
-  auto ct = 1.0i * dt;
+  std::complex<double> ct{0.0, dt};
   auto cx = ct / (4.0 * dx * dx);
   auto cy = ct / (4.0 * dy * dy);
 
@@ -74,8 +73,8 @@ struct GaussianWavePacket {
   double x0 = 0.5;
   double y0 = 0.5;
   double sigma = 1.0;
-  double kx = 1.0;
-  double ky = 1.0;
+  double kx = 0.0;
+  double ky = 0.0;
   double sigma2 = sigma * sigma;
 
   auto operator()(double x, double y) const {
@@ -90,7 +89,9 @@ struct GaussianWavePacket {
 
 void set_initial_condition(VectorXcd& u0, const VectorXd& xs,
                            const VectorXd& ys) {
-  GaussianWavePacket gwp{0.2, 0.4, 0.08, std::numbers::pi * 85.0, 0.0};
+  auto kx = std::numbers::pi * 100;
+  auto ky = std::numbers::pi * 50;
+  GaussianWavePacket gwp{0.2, 0.4, 0.08, kx, ky};
 
   for (auto i = 0; i < ys.size(); ++i)
     for (auto j = 0; j < xs.size(); ++j)
@@ -111,6 +112,8 @@ void output_solution(std::ostream& os, const VectorXcd& u, const VectorXd& xs,
 }
 
 int main() {
+  Timer timer(true);
+
   auto nx = 256;
   auto ny = nx;
   auto sz = nx * ny;
@@ -119,8 +122,10 @@ int main() {
   auto dx = xs[1] - xs[0];
   auto dy = dx;
   auto dt = dx * dy / 4;
+  auto nt = 4096;
+  auto fps = 64;
 
-  SparseMatrix<std::complex<double>> A(sz, sz);
+  SparseMatrix<std::complex<double>, RowMajor> A(sz, sz);
   VectorXcd b;
   VectorXcd u;
   VectorXcd u0;
@@ -131,7 +136,8 @@ int main() {
   set_initial_condition(u0, xs, ys);
   set_matrix(A, xs, ys, dt);
   set_rhs(b, u0, xs, ys, dt);
-  SparseLU<decltype(A)> solver;
+  BiCGSTAB<decltype(A)> solver;
+  // SparseLU<decltype(A)> solver;
   solver.compute(A);
 
   if (solver.info() != Success) {
@@ -140,29 +146,29 @@ int main() {
   }
 
   std::ofstream ofs;
-  std::cout << "Solving dofs: " << sz << "\n";
+  std::cout << "Solving dofs: " << sz << ", threads: " << nbThreads() << '\n';
 
-  auto i = 0;
-  auto print = 0;
   auto t = 0.0;
-  for (; i < 2048; ++i, t += dt) {
-    if (i % 16 == 0) {
-      ofs.open("./data/u" + std::to_string(print++) + ".dat");
+  auto print_index = 0;
+
+  for (auto i = 0; i < nt; ++i, t += dt) {
+    if (i % fps == 0) {
+      ofs.open("./data/u" + std::to_string(print_index++) + ".dat");
       output_solution(ofs, u0, xs, ys);
       ofs.close();
     }
 
-    u = solver.solve(b);
+    u = solver.solveWithGuess(b, u0);
     u0 = u;
     b.setZero();
     set_rhs(b, u0, xs, ys, dt);
   }
 
-  ofs.open("./data/u" + std::to_string(print++) + ".dat");
+  ofs.open("./data/u" + std::to_string(print_index++) + ".dat");
   output_solution(ofs, u0, xs, ys);
   ofs.close();
 
-  std::cout << i << '\n';
-  std::cout << print << '\n';
-  std::cout << t << '\n';
+  std::cout << "Iterations: " << nt << '\n';
+  std::cout << "Printed: " << print_index << '\n';
+  std::cout << "End time: " << t << '\n';
 }
