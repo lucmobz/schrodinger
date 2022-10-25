@@ -5,5 +5,3 @@ CPPFLAGS="-std=c++20 -O3 -march=native -fopenmp"
 EIGEN_INC="./eigen"
 
 c++ $CPPFLAGS -I"$EIGEN_INC" main.cpp -o main
-
-./main
